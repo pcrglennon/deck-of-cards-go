@@ -34,35 +34,87 @@ func initializeDeck() (deck Deck) {
 // [push_up, rest, plank, rest, ...]
 func initializeActivityTypes(length int) (activityTypes []string) {
 	for i := 0; i < length; i++ {
-		activityType := ""
-
 		switch i % 4 {
 		case 0:
-			activityType = "push_up"
+			activityTypes = append(activityTypes, "push_up")
 		case 2:
-			activityType = "plank"
+			activityTypes = append(activityTypes, "plank")
 		default:
-			activityType = "rest"
+			activityTypes = append(activityTypes, "rest")
 		}
-
-		activityTypes = append(activityTypes, activityType)
 	}
 
 	return
 }
 
+func promptMessage(cardsRemaining int) string {
+	if cardsRemaining%5 == 0 {
+		return fmt.Sprintf("\nPress Enter to draw next card (%d cards remaining):", cardsRemaining)
+	} else {
+		return "\nPress Enter to draw next card:"
+	}
+}
+
 func outputActivity(card Card, activityType string) {
-	cardValue := card.IntValue()
-	fmt.Printf("Card: %s of %s ---> ", card.Type, card.Suit)
+	fmt.Printf("\nCard: %s of %s ---> ", card.Type, card.Suit)
+
+	normalizedCardValue := normalizeCardValue(card.IntValue())
+	activityValue := valueForActivity(normalizedCardValue, activityType)
 
 	switch activityType {
 	case "push_up":
-		fmt.Printf("%d Push-Ups\n", cardValue)
+		fmt.Printf("%d Push-Ups\n", activityValue)
 	case "plank":
-		fmt.Printf("%d-second Plank\n", cardValue)
+		fmt.Printf("%d-second Plank\n", activityValue)
+		fmt.Println("Starting in 2 seconds…")
+		time.Sleep(2 * time.Second)
+		displayActivityTimer(activityValue, 10)
 	default:
-		fmt.Printf("%d-second Rest\n", cardValue)
+		fmt.Printf("%d-second Rest\n", activityValue)
+		displayActivityTimer(activityValue, 5)
 	}
+}
+
+// override card-value rules:
+//   - treat all face-value cards as 10
+//   - treat all Aces as 11
+func normalizeCardValue(cardValue int) int {
+	switch cardValue {
+	case 11, 12, 13:
+		return 10
+	case 14:
+		return 11
+	default:
+		return cardValue
+	}
+}
+
+func valueForActivity(cardValue int, activityType string) int {
+	switch activityType {
+	case "plank":
+		return cardValue * 3
+	case "rest":
+		return cardValue * 2
+	default:
+		return cardValue
+	}
+}
+
+func displayActivityTimer(activityTimeSeconds int, intervalSeconds int) {
+	fmt.Print("Starting: 0…")
+
+	time.Sleep(1 * time.Second)
+
+	for i := 1; i < activityTimeSeconds; i++ {
+		if (activityTimeSeconds - i) < intervalSeconds { // output update for each second of final interval
+			fmt.Printf(" %d,", i)
+		} else if (i % intervalSeconds) == 0 { // output update for each interval
+			fmt.Printf(" %d…", i)
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	fmt.Printf(" %d!\n", activityTimeSeconds)
 }
 
 // Seed our randomness with the current time
@@ -77,16 +129,12 @@ func main() {
 	activityTypes := initializeActivityTypes(len(deck.Cards))
 
 	for i := 0; i < len(deck.Cards); i++ {
-		if len(deck.Cards)%5 == 0 {
-			fmt.Printf("\n(%d cards remaining)\n\n", len(deck.Cards))
-		}
-
-		// wait for input
-		fmt.Println("Press Enter to draw next card")
-		reader.ReadString('\n')
-
 		card := deck.Deal()
 		outputActivity(card, activityTypes[i])
+
+		// wait for Enter input to start next Activity
+		fmt.Print(promptMessage(len(deck.Cards)))
+		reader.ReadString('\n')
 	}
 
 	fmt.Println("\n\n------------ Done! ------------")
